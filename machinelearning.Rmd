@@ -1,0 +1,84 @@
+---
+title: "Machine Learning Assignment:Prediction of activity quality from activity monitors"
+output: html_document
+---
+
+This report aims to create a prediction model to determine what classe an activity would fall into (activity quality A-E) based on information from activity monitors. 
+
+## Reading in the training and testing datasets and librarys:
+```{r}
+setwd("C:/Users/kate/Documents/datascience/coursera")
+training<-read.csv("C:/Users/kate/Documents/datascience/coursera/pml-training.csv")
+testing<-read.csv("C:/Users/kate/Documents/datascience/coursera/pml-testing.csv")
+library(caret)
+library(randomForest)
+```
+
+## preprocessing:
+make sure that models will treat the classe column/dependant variable as a classification/factor:
+```{r}
+class(training$classe)
+```
+subsetting the training set so that the only variables with the class numeric remains in addition to the dependant variable, so that the time and user information is excluded because logically it is unlikely that these will predict for classe. I wanted to focus only on the sensor data:
+```{r}
+trainingsub<-training[,sapply(training,is.numeric)]
+trainingsub$classe<-training$classe
+trainingsub<-trainingsub[,colMeans(is.na(trainingsub)) == 0] 
+trainingsub[, 1]<-NULL
+trainingsub[, 1]<-NULL
+trainingsub[, 1]<-NULL
+```
+
+## fit the model:
+First I needed to split the training set into a train set for the fitting of the model and a test set for the validation of the model. I made a 6:4 split of train:test.
+```{r}
+inTrain<- createDataPartition(y=trainingsub$classe, p=0.6, list=FALSE) 
+trainsub<-trainingsub[inTrain,] 
+testsub<-trainingsub[-inTrain,] 
+```
+
+I chose not to use a regression as I am not trying to predict a continuous number, but rather a classification/factor of the individual's technique.Therefore I decided to use a random forest model wich may be used for either continuous numbers or classification dependant variables. 
+
+Using random forest, I must set seed value since it is random before fitting the model:
+```{r}
+set.seed(100)
+modelFit<-randomForest(formula = classe ~ ., data = trainsub, importance=TRUE)
+modelFit
+```
+
+## cross validation:
+
+Random forest does its own internal cross validation (http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#ooberr)
+
+## expected out of sample error - error from sample not used in training:
+
+the test subset from the training dataset is used with the predict function. I then made a table of the predictions and the observed values in the classe column. The following table is the proportions in each group. Following the second table is the out of sample error.
+```{r}
+prediction<-predict(modelFit, testsub)
+t = table(observed=testsub[,'classe'], predict=prediction)
+t
+prop.table(t,1)
+OOSerror<-mean(prediction!=testsub$classe)
+OOSerror
+```
+therefore the out of sample error is approximately 0.37%
+
+prediction of the testing set for the automated grading part of the assignment:
+```{r}
+testingsub<-testing[,sapply(testing,is.numeric)]
+testingsub<-testingsub[,colMeans(is.na(testingsub)) == 0] 
+testingsub[, 1]<-NULL
+testingsub[, 1]<-NULL
+testingsub[, 1]<-NULL
+predictions<-predict(modelFit, testingsub)
+predictions
+answers<-predictions
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(answers)
+```
